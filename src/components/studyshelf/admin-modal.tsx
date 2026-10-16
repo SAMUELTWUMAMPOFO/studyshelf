@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircle,
   FolderOpen,
@@ -25,6 +26,11 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { AdminStatus } from "@/lib/types";
+import {
+  adminFetch,
+  clearSessionToken,
+  setSessionToken,
+} from "@/lib/session";
 
 import { ManageMaterials } from "./manage-materials";
 import { UploadMaterialForm } from "./upload-material-form";
@@ -49,6 +55,7 @@ function AdminModalSkeleton() {
 }
 
 function LoginForm({ onSuccess }: { onSuccess: () => void }) {
+  const queryClient = useQueryClient();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -61,16 +68,27 @@ function LoginForm({ onSuccess }: { onSuccess: () => void }) {
     setPending(true);
     setError(null);
     try {
-      const res = await fetch("/api/admin/login", {
+      const res = await adminFetch("/api/admin/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: email.trim(), password }),
       });
-      const body = (await res.json().catch(() => null)) as { error?: string } | null;
+      const body = (await res.json().catch(() => null)) as
+        | { error?: string; token?: string; email?: string }
+        | null;
       if (!res.ok) {
         setError(body?.error ?? "Invalid email or password.");
         return;
       }
+      // Store the token (works even where cookies are dropped) and unlock the
+      // dashboard immediately — no waiting for a refetch.
+      if (body?.token) setSessionToken(body.token);
+      queryClient.setQueryData<AdminStatus>(["admin-status"], {
+        authenticated: true,
+        email: body?.email,
+        needsSetup: false,
+        requiresCode: false,
+      });
       toast.success("Signed in successfully.");
       setPassword("");
       onSuccess();
@@ -132,6 +150,7 @@ function SetupForm({
   requiresCode: boolean;
   onSuccess: () => void;
 }) {
+  const queryClient = useQueryClient();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -159,7 +178,7 @@ function SetupForm({
 
     setPending(true);
     try {
-      const res = await fetch("/api/admin/setup", {
+      const res = await adminFetch("/api/admin/setup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -169,12 +188,23 @@ function SetupForm({
           ...(requiresCode ? { setupCode: setupCode.trim() } : {}),
         }),
       });
-      const body = (await res.json().catch(() => null)) as { error?: string } | null;
+      const body = (await res.json().catch(() => null)) as
+        | { error?: string; token?: string; email?: string }
+        | null;
       if (!res.ok) {
         setError(body?.error ?? "Setup failed. Please try again.");
         return;
       }
-      toast.success("Administrator account created — please sign in.");
+      // The setup endpoint signs us in — store the token and go straight to
+      // the dashboard.
+      if (body?.token) setSessionToken(body.token);
+      queryClient.setQueryData<AdminStatus>(["admin-status"], {
+        authenticated: true,
+        email: body?.email,
+        needsSetup: false,
+        requiresCode: false,
+      });
+      toast.success("Administrator account created.");
       setEmail("");
       setPassword("");
       setConfirmPassword("");
@@ -274,6 +304,7 @@ function AdminDashboard({
   email: string;
   onSignOut: () => void;
 }) {
+  const queryClient = useQueryClient();
   const [signingOut, setSigningOut] = useState(false);
 
   const handleLogout = async () => {
@@ -281,12 +312,19 @@ function AdminDashboard({
 
     setSigningOut(true);
     try {
-      const res = await fetch("/api/admin/logout", { method: "POST" });
+      const res = await adminFetch("/api/admin/logout", { method: "POST" });
       const body = (await res.json().catch(() => null)) as { error?: string } | null;
       if (!res.ok) {
         toast.error(body?.error ?? "Sign out failed.");
         return;
       }
+      // Drop the token and lock the panel immediately.
+      clearSessionToken();
+      queryClient.setQueryData<AdminStatus>(["admin-status"], {
+        authenticated: false,
+        needsSetup: false,
+        requiresCode: false,
+      });
       toast.success("Signed out.");
       onSignOut();
     } catch {

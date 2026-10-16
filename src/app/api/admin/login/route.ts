@@ -56,7 +56,9 @@ export async function POST(req: NextRequest) {
     failTracker.delete(ip)
 
     const token = await createSession(account.id)
-    const res = NextResponse.json({ ok: true, email: account.email })
+    // The token is returned so the browser can use the X-Session-Token header
+    // in contexts where cookies are dropped (e.g. embedded preview iframes).
+    const res = NextResponse.json({ ok: true, email: account.email, token })
     res.cookies.set(SESSION_COOKIE_NAME, token, {
       httpOnly: true,
       sameSite: 'lax',

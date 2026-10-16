@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { MAX_FILE_SIZE_MB } from "@/lib/constants";
 import { validateMaterialFile } from "@/lib/format";
+import { SESSION_TOKEN_HEADER, clearSessionToken, getSessionToken } from "@/lib/session";
 
 import { invalidateMaterialQueries } from "./api";
 import { FilePicker } from "./file-picker";
@@ -27,6 +28,10 @@ function uploadWithProgress(
     const xhr = new XMLHttpRequest();
     xhr.open("POST", "/api/admin/materials");
     xhr.responseType = "json";
+    // Attach the admin session token — required where cookies are dropped
+    // (embedded preview iframes, strict browsers).
+    const token = getSessionToken();
+    if (token) xhr.setRequestHeader(SESSION_TOKEN_HEADER, token);
     xhr.upload.onprogress = (event) => {
       if (event.lengthComputable) {
         onProgress(Math.round((event.loaded / event.total) * 100));
@@ -106,6 +111,10 @@ export function UploadMaterialForm() {
         setFile(null);
         setProgress(0);
         invalidateMaterialQueries(queryClient);
+      } else if (status === 401) {
+        clearSessionToken();
+        void queryClient.invalidateQueries({ queryKey: ["admin-status"] });
+        toast.error("Your session has expired — please sign in again.");
       } else {
         const errorBody = body as { error?: string } | null;
         toast.error(errorBody?.error ?? "Upload failed. Please try again.");

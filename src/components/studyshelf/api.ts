@@ -3,6 +3,7 @@
 import type { QueryClient } from "@tanstack/react-query";
 
 import type { AdminStatus, MaterialsResponse } from "@/lib/types";
+import { adminFetch } from "@/lib/session";
 
 // Shared filter state for the public library. "all" means the filter is not applied.
 export interface MaterialFilters {
@@ -62,7 +63,9 @@ export async function fetchMaterials(
 }
 
 export async function fetchAdminStatus(): Promise<AdminStatus> {
-  const res = await fetch("/api/admin/status");
+  // Uses adminFetch so a stored session token works even where the browser
+  // drops cookies (e.g. embedded preview iframes).
+  const res = await adminFetch("/api/admin/status");
   if (!res.ok) throw await parseErrorResponse(res, "Failed to load admin status.");
   return (await res.json()) as AdminStatus;
 }

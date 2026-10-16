@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { SESSION_COOKIE_NAME, destroySession } from '@/lib/auth'
+import { requestSessionToken } from '@/lib/admin-guard'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -7,7 +8,7 @@ export const runtime = 'nodejs'
 // POST /api/admin/logout — invalidate the session and clear the cookie.
 export async function POST(req: NextRequest) {
   try {
-    const token = req.cookies.get(SESSION_COOKIE_NAME)?.value
+    const token = requestSessionToken(req)
     if (token) {
       await destroySession(token)
     }

@@ -92,3 +92,19 @@ Work Log:
 
 Stage Summary:
 - StudyShelf complete and verified. User must do: open site -> Admin -> one-time setup (email + password of their choice, never shared with the assistant).
+
+---
+Task ID: 6
+Agent: main orchestrator
+Task: Fix admin panel not unlocking after successful login + mobile file picker
+
+Work Log:
+- Diagnosis: user account existed and 7 server-side sessions had been created — login succeeded every time, but the browser dropped the SameSite=Lax session cookie inside the embedded preview iframe (third-party-cookie blocking). /api/admin/status then returned authenticated:false, so the modal stayed on the login form despite the success toast.
+- Server fix: admin routes now accept the session token via X-Session-Token header OR cookie (src/lib/admin-guard.ts requestSessionToken). /api/admin/login and /api/admin/setup return the token in JSON; setup now auto-signs-in. Logout destroys header or cookie sessions.
+- Client fix: new src/lib/session.ts (sessionStorage token + in-memory fallback, adminFetch wrapper). Login/setup store the token and optimistically setQueryData(['admin-status']) so the dashboard unlocks INSTANTLY. All admin calls (status, upload XHR, PATCH, DELETE, logout) send the token; 401 clears token and returns to the sign-in form with a clear message.
+- File picker fix: replaced display:none input + JS .click() with a native <label htmlFor> + sr-only input (works on iOS Safari/Android), with a "Change" label and improved selected-file row.
+- Verified: curl (login returns 96-char token; status/upload/delete work with header only; invalid token rejected). Browser top-level: login -> instant dashboard -> upload -> instant library update -> logout. Browser cross-origin iframe: login -> dashboard -> COOKIES CLEARED -> reload -> still authenticated -> cookie-less upload succeeded -> logout locked.
+- Cleanup: removed test admin account, its sessions, all test materials/files. User account (twumampofosamuel2@gmail.com) and library left pristine (0 materials). Lint clean.
+
+Stage Summary:
+- Root cause was cookie loss in embedded/iframe contexts; now auth is dual-transport and works everywhere. Setup also auto-signs-in. Mobile file picking is iOS-safe.

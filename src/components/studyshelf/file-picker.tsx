@@ -1,9 +1,8 @@
 "use client";
 
-import { useRef, type ChangeEvent } from "react";
+import { useId, type ChangeEvent } from "react";
 import { FileText, FileUp, X } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
 import { humanFileSize } from "@/lib/format";
 
 interface FilePickerProps {
@@ -15,6 +14,11 @@ interface FilePickerProps {
 
 /**
  * Dashed drop-zone style picker for a single PDF / PPT / PPTX file.
+ *
+ * Uses a native <label> bound to a visually-hidden (but rendered) file input
+ * instead of a display:none input + programmatic click(). Programmatic clicks
+ * on hidden inputs are unreliable on mobile browsers (notably iOS Safari) —
+ * the native label always opens the device file picker / Files app.
  * Validation is handled by the parent through onSelect.
  */
 export function FilePicker({
@@ -23,7 +27,7 @@ export function FilePicker({
   onClear,
   disabled = false,
 }: FilePickerProps) {
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputId = useId();
 
   const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
     const selected = event.target.files?.[0];
@@ -35,10 +39,10 @@ export function FilePicker({
   return (
     <div>
       <input
-        ref={inputRef}
+        id={inputId}
         type="file"
         accept=".pdf,.ppt,.pptx"
-        className="hidden"
+        className="sr-only"
         onChange={handleChange}
         disabled={disabled}
       />
@@ -53,29 +57,35 @@ export function FilePicker({
               <p className="text-xs text-slate-500">{humanFileSize(file.size)}</p>
             </div>
           </div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="h-9 w-9 shrink-0"
-            aria-label="Remove selected file"
-            onClick={onClear}
-            disabled={disabled}
-          >
-            <X />
-          </Button>
+          <div className="flex shrink-0 items-center gap-1">
+            <label
+              htmlFor={inputId}
+              className="inline-flex h-9 cursor-pointer items-center rounded-md px-2 text-xs font-medium text-primary hover:bg-slate-100"
+            >
+              Change
+            </label>
+            <button
+              type="button"
+              aria-label="Remove selected file"
+              onClick={(event) => {
+                event.preventDefault();
+                onClear();
+              }}
+              disabled={disabled}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50"
+            >
+              <X className="h-4 w-4" aria-hidden />
+            </button>
+          </div>
         </div>
       ) : (
-        <Button
-          type="button"
-          variant="outline"
-          className="h-20 w-full flex-col gap-1.5 border-2 border-dashed border-slate-300 bg-slate-50 text-slate-600 hover:border-primary/40 hover:bg-slate-100 hover:text-primary"
-          onClick={() => inputRef.current?.click()}
-          disabled={disabled}
+        <label
+          htmlFor={inputId}
+          className="flex h-20 w-full cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border-2 border-dashed border-slate-300 bg-slate-50 text-slate-600 transition-colors hover:border-primary/40 hover:bg-slate-100 hover:text-primary"
         >
           <FileUp className="h-5 w-5" aria-hidden />
-          Choose PDF, PPT or PPTX file
-        </Button>
+          <span className="text-sm font-medium">Choose PDF, PPT or PPTX file</span>
+        </label>
       )}
     </div>
   );

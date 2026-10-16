@@ -184,15 +184,23 @@ src/components/studyshelf/    # header, hero, filters, cards, admin modal, forms
 
 - Passwords are scrypt-hashed with per-account salts; never stored in plain
   text, never hardcoded, never sent back to the client.
-- Sessions are random 48-byte tokens stored server-side (7-day expiry),
-  delivered in an httpOnly + SameSite=Lax cookie (Secure in production).
+- Sessions are random 48-byte tokens stored server-side (7-day expiry) with
+  expired-session cleanup.
+- Dual transport for the session: an httpOnly + SameSite=Lax cookie for normal
+  top-level browsing, **plus an `X-Session-Token` request header** that the
+  app attaches from `sessionStorage`. This keeps the admin panel working when
+  the site is embedded (preview panels/iframes) or the browser blocks
+  third-party cookies (e.g. Safari iOS). Token storage clears when the tab
+  closes.
 - Every mutating endpoint (`POST/PATCH/DELETE /api/admin/**`) verifies the
-  session **on the server** and returns 401 otherwise — hiding the admin UI
-  alone is never the security boundary.
+  session **on the server** (header or cookie) and returns 401 otherwise —
+  hiding the admin UI alone is never the security boundary.
 - Login is rate-limited (5 failed attempts → 10-minute lockout per IP).
 - Uploads are validated server-side (extension whitelist + 50 MB cap +
   non-empty), and stored files are only reachable through the download API
   (never directly via `/public`).
+- The file picker uses a native `<label>` + visually-hidden input, which opens
+  the device file picker reliably on iOS Safari and Android.
 - One-time setup can be additionally protected with `ADMIN_SETUP_CODE`.
 - Downloads are counted and served with a sanitized `Content-Disposition`
   filename.

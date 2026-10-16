@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { SESSION_COOKIE_NAME, getSessionAccount } from '@/lib/auth'
+import { getSessionAccount } from '@/lib/auth'
+import { requestSessionToken } from '@/lib/admin-guard'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -8,7 +9,7 @@ export const runtime = 'nodejs'
 // GET /api/admin/status — public; tells the UI whether setup/login is needed.
 export async function GET(req: NextRequest) {
   try {
-    const token = req.cookies.get(SESSION_COOKIE_NAME)?.value
+    const token = requestSessionToken(req)
     const [account, adminCount] = await Promise.all([
       getSessionAccount(token),
       db.adminAccount.count(),

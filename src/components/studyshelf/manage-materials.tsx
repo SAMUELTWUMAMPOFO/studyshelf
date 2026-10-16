@@ -28,6 +28,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LEVELS } from "@/lib/constants";
 import { humanFileSize, validateMaterialFile } from "@/lib/format";
+import { adminFetch, clearSessionToken } from "@/lib/session";
 import type { Material } from "@/lib/types";
 
 import { DEFAULT_FILTERS, fetchMaterials, invalidateMaterialQueries } from "./api";
@@ -128,13 +129,19 @@ export function ManageMaterials() {
       formData.append("lecturer", editForm.lecturer.trim());
       formData.append("description", editForm.description.trim());
 
-      const res = await fetch(`/api/admin/materials/${editing.id}`, {
+      const res = await adminFetch(`/api/admin/materials/${editing.id}`, {
         method: "PATCH",
         body: formData,
       });
       const body = (await res.json().catch(() => null)) as { error?: string } | null;
       if (!res.ok) {
-        toast.error(body?.error ?? "Could not save changes.");
+        if (res.status === 401) {
+          clearSessionToken();
+          void queryClient.invalidateQueries({ queryKey: ["admin-status"] });
+          toast.error("Your session has expired — please sign in again.");
+        } else {
+          toast.error(body?.error ?? "Could not save changes.");
+        }
         return;
       }
       toast.success("Changes saved.");
@@ -155,13 +162,19 @@ export function ManageMaterials() {
       const formData = new FormData();
       formData.append("file", replaceFile);
 
-      const res = await fetch(`/api/admin/materials/${replacing.id}`, {
+      const res = await adminFetch(`/api/admin/materials/${replacing.id}`, {
         method: "PATCH",
         body: formData,
       });
       const body = (await res.json().catch(() => null)) as { error?: string } | null;
       if (!res.ok) {
-        toast.error(body?.error ?? "Could not replace the file.");
+        if (res.status === 401) {
+          clearSessionToken();
+          void queryClient.invalidateQueries({ queryKey: ["admin-status"] });
+          toast.error("Your session has expired — please sign in again.");
+        } else {
+          toast.error(body?.error ?? "Could not replace the file.");
+        }
         return;
       }
       toast.success("File replaced.");
@@ -180,12 +193,18 @@ export function ManageMaterials() {
 
     setDeletePending(true);
     try {
-      const res = await fetch(`/api/admin/materials/${deleteTarget.id}`, {
+      const res = await adminFetch(`/api/admin/materials/${deleteTarget.id}`, {
         method: "DELETE",
       });
       const body = (await res.json().catch(() => null)) as { error?: string } | null;
       if (!res.ok) {
-        toast.error(body?.error ?? "Could not delete the material.");
+        if (res.status === 401) {
+          clearSessionToken();
+          void queryClient.invalidateQueries({ queryKey: ["admin-status"] });
+          toast.error("Your session has expired — please sign in again.");
+        } else {
+          toast.error(body?.error ?? "Could not delete the material.");
+        }
         return;
       }
       toast.success("Material deleted from the library.");

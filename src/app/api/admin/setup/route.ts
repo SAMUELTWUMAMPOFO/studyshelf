@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { hashPassword } from '@/lib/auth'
+import { SESSION_COOKIE_NAME, SESSION_MAX_AGE, createSession, hashPassword } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -59,11 +59,23 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    await db.adminAccount.create({
+    const account = await db.adminAccount.create({
       data: { email, passwordHash: hashPassword(password) },
     })
 
-    return NextResponse.json({ ok: true })
+    // Auto sign-in: the person who just created the account obviously knows
+    // the credentials, so take them straight to the dashboard. The token is
+    // also returned for cookie-less contexts (embedded preview iframes).
+    const token = await createSession(account.id)
+    const res = NextResponse.json({ ok: true, email: account.email, token })
+    res.cookies.set(SESSION_COOKIE_NAME, token, {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+      path: '/',
+      maxAge: SESSION_MAX_AGE,
+    })
+    return res
   } catch (err) {
     console.error('POST /api/admin/setup failed:', err)
     return NextResponse.json(
