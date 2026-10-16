@@ -1,0 +1,52 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// A study material (lecture slides, notes, past questions, etc.)
+model Material {
+  id           String   @id @default(cuid())
+  title        String
+  courseName   String
+  courseCode   String
+  programme    String
+  level        String // "100" | "200" | "300" | "400"
+  semester     String // "Semester 1" | "Semester 2"
+  materialType String // "Lecture Slides", "Past Questions", ...
+  description  String?
+  lecturer     String?
+  filePath     String // stored filename inside the uploads directory
+  fileType     String // "pdf" | "ppt" | "pptx"
+  fileSize     Int // bytes
+  downloads    Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([level])
+  @@index([programme])
+  @@index([courseCode])
+  @@index([materialType])
+}
+
+// The single administrator account, created through first-time setup
+model AdminAccount {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String // scrypt hash: "salt:hash"
+  createdAt    DateTime @default(now())
+}
+
+// Server-side sessions for the administrator
+model Session {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  accountId String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([accountId])
+}
